@@ -1,0 +1,173 @@
+Watchface File Format
+*********************
+All values are Little endian
+
+First there is a file header
+
++--------------+
+| file header  |
++--------------+
+
+Then N decriptors
+Of 14 bytes
+
++--------------+
+| Descriptor 01|
++--------------+
+| Descriptor 02|
++--------------+
+  <......> 
++--------------+
+| Descriptor n |
++--------------+
+
+Then M entries
++--------------+
+| Entry 01     |
++--------------+
+| Entry 02     |
++--------------+
+| Entry 03     |
++--------------+
+  <......> 
++--------------+
+| Entry  m     |
++--------------+
+
+And Payloads (data)
++--------------+
+| Payload 01   |
++--------------+
+| Payload 03   |
++--------------+
+| Payload 03   |
++--------------+
+| Payload 04   |
++--------------+
+  <......> 
++--------------+
+| Payload  p   |
++--------------+
+
+
+Files Header
+************
+
+struct file_header {
+       uint16_t unknown_01; /* 0x04 */
+       uint16_t unknown_02; /* 0x02 */
+       uint16_t unknown_03; /* 0x01 */
+       uint16_t num_descriptors;
+};
+
+Entries Descriptors
+*******************
+
+
+struct descriptor_watchface_entry {
+       uint16_t unkown01; /* 0x01 */
+       uint16_t width;
+       uint16_t height;
+       uint16_t num_resources;
+}
+
+
+A graphical element has a width and height
+It can have num_values indexed values
+  (eg: 0 to 9 for a digital font)
+And it can be num_items wide (eg: 3 for 000 to 999 for a digital font)
+  
+struct descriptor_graphical_entry {
+       uint16_t width;
+       unit16_t height;
+       uint16_t num_values;
+       uint16_t num_items;
+}
+
+enum descriptor_type {
+     WATCHFACE_ELEMENTS  = 0xfe01,
+     GRAPHICAL_PREVIEW   = 0xff04,
+     GRAPHICAL_IMAGE     = 0x0004
+     GRAPHICAL_HOUR      = 0x0304,
+     GRAPHICAL_MINUTE    = 0x0404,
+     ...
+     
+}
+
+struct descriptor {
+       uint16_descriptor_type;
+       union {
+         struct descriptor_watchface_entrys;
+         struct descriptor_graphical_entry;
+       }
+       int32_t offset_in_file;
+}
+       
+
+
+Entries
+*******
+
+Wathface Entry:
+***************
+Then entries depends of the entry type
+
+num_resources is from the descriptor_watchface_entry.
+
+struct watchface_entry {
+       struct {
+          int32_t offset;
+	  uint32_t size;
+       } declared_ressources[num_resources];
+}
+
+
+
+Graphical Element Entry
+***********************
+num_values and num_items are from the descriptor
+
+struct graphical_entry {
+       uint16_t color_rgb565;
+       uint16_t payload_type;
+       struct {
+       	      uint16_t x;
+	      uint16_t y;
+       } position[num_items]; /* note that only the first one is used, other are set to 0 */
+        struct {
+          int32_t offset;
+	  uint32_t size;
+       } payloads[num_values];
+
+}
+
+Payload_types:
+**************
+
+enum {
+     PAYLOAD_RAWRGB565 = 0x0188
+     PAYLOAD_COMPRESSED_RGB565 = 0x0887,
+     PAYLOAD_4BIT_MASK = 0x0483,
+     PAYLOAD_not_defined_yet = 0x0382,
+}
+
+Compression Format
+******************
+for a (w x h) image:
+struct header {
+       uint32_t line_entries[h];
+}
+each line_entry is:
+
+  offset_after header on 22 bits
+  size of data on 10 bits << 22
+
+each line data is RLE compressed:
+either:
+ first byte: 0x80 | num, rgb565
+   -> produce num rgb565 raw values
+   eg 0x82,0xaa,0xbb -> 0xaa,0xbb, 0xaa,0xbb
+or   
+ first byte = num & 0x7f, rgb565[0], rgb565[1],...rgb565[num]
+
+
